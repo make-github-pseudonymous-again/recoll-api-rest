@@ -1,0 +1,74 @@
+name: 'Build Recoll'
+description: 'Build Recoll'
+
+inputs:
+  sources-path:
+    description: 'Where to look for the sources'
+    required: true
+  build-path:
+    description: 'Where to store the build'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+     # SEE https://github.com/orgs/community/discussions/51280
+    - name: Set up environment variables
+      shell: bash
+      run: |
+        echo "BUILD_DIR=${{ inputs.build-path }}" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get install \
+          pkg-config \
+          gettext \
+          make \
+          clang \
+          libxapian-dev \
+          libxslt1-dev \
+          zlib1g-dev \
+          libaspell-dev \
+          python3-all-dev \
+          python3-setuptools
+
+    - name: Cache Recoll build
+      id: cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.build-path }}
+        key: recoll-build-cache-${{ hashFiles(inputs.sources-path) }}-${{ inputs.build-path }}
+
+    - name: Create build directory
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir ${{ env.BUILD_DIR }}
+
+    - name: Extract recoll
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        tar -xvf ${{ inputs.sources-path }} -C ${{ env.BUILD_DIR }} --strip-components=1
+
+    - name: Configure recoll build
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        ./configure \
+          --prefix=/usr \
+          --enable-publiclib \
+          --disable-python-chm \
+          --disable-qtgui \
+          --disable-userdoc \
+          --disable-sse
+
+    - name: Build recoll
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        make

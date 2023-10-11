@@ -1,0 +1,214 @@
+name: ci
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+
+  unit:
+
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+        recoll-version:
+          - '1.35.0'
+        include:
+          - tox-env: 'unit'
+          - python-version: '3.9'
+            tox-env: ${{ github.actor != 'dependabot[bot]' && 'unit-cover' || 'unit' }}
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Download recoll
+        uses: ./.github/actions/download-recoll
+        with:
+          recoll-version: ${{ matrix.recoll-version }}
+          path: recoll.tar.gz
+
+      - name: Build recoll
+        uses: ./.github/actions/build-recoll
+        with:
+          sources-path: recoll.tar.gz
+          build-path: ./recoll
+
+      - name: Install recoll
+        shell: bash
+        working-directory: ./recoll
+        run: |
+          sudo make install
+          sudo chown -R "${USER}:${USER}" .
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install recoll Python API
+        shell: bash
+        working-directory: ./recoll/python/recoll
+        run: |
+          pip install .
+
+      - name: Run unit tests with tox${{ matrix.tox-env == 'unit-cover' && ' (with coverage).' || '.' }}
+        shell: bash
+        run: poetry run tox -e ${{ matrix.tox-env }}
+
+
+  doctest:
+
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.9'
+          - '3.10'
+          - '3.11'
+        recoll-version:
+          - '1.35.0'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Download recoll
+        uses: ./.github/actions/download-recoll
+        with:
+          recoll-version: ${{ matrix.recoll-version }}
+          path: recoll.tar.gz
+
+      - name: Build recoll
+        uses: ./.github/actions/build-recoll
+        with:
+          sources-path: recoll.tar.gz
+          build-path: ./recoll
+
+      - name: Install recoll
+        shell: bash
+        working-directory: ./recoll
+        run: |
+          sudo make install
+          sudo chown -R "${USER}:${USER}" .
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install recoll Python API
+        shell: bash
+        working-directory: ./recoll/python/recoll
+        run: |
+          pip install .
+
+      - name: Run doctest tests with tox
+        shell: bash
+        run: poetry run tox -e doctest
+
+
+  pre-commit:
+
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.11'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Pre-commit hooks
+        env:
+          SKIP: lint-check,type-check,licenses
+        run: poetry run pre-commit run -a
+
+
+  lint-check:
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.9'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Lint sources and tests
+        run: poetry run tox -e lint-check
+
+
+  type-check:
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.9'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Type checking
+        run: poetry run tox -e type-check
+
+
+  licenses:
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+        python-version:
+          - '3.11'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-poetry
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check dependencies' licenses
+        run: poetry run tox -e licenses
