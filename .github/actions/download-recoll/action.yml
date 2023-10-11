@@ -1,0 +1,46 @@
+name: 'Download Recoll'
+description: 'Download Recoll'
+
+inputs:
+  recoll-version:
+    description: 'The version of Recoll to download'
+    required: true
+  path:
+    description: 'Where to store the downloaded file'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Cache Recoll v${{ inputs.recoll-version }} download
+      id: cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.path }}
+        key: recoll-download-cache-${{ inputs.recoll-version }}-${{ inputs.path }}
+
+     # SEE https://github.com/orgs/community/discussions/51280
+    - name: Set environment variables
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "VERSION=${{ inputs.recoll-version }}" >> $GITHUB_ENV
+
+    - name: Download Recoll v${{ inputs.recoll-version }}
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      run: |
+        wget https://www.lesbonscomptes.com/pages/lesbonscomptes.gpg
+        gpg --import lesbonscomptes.gpg
+        gpg --export '7808CE96D38B9201' | sudo apt-key add -
+        wget "https://www.lesbonscomptes.com/recoll/recoll-${VERSION}.tar.gz"
+        wget "https://www.lesbonscomptes.com/recoll/recoll-${VERSION}.tar.gz.asc"
+        gpg --verify "recoll-${VERSION}.tar.gz.asc"
+
+    - name: Move Recoll v${{ inputs.recoll-version }} to input path
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mv "${{ runner.temp }}/recoll-${VERSION}.tar.gz" ${{ inputs.path }}
