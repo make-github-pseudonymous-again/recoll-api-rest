@@ -1,0 +1,13 @@
+services:
+  api:
+    build:
+      context: .
+      args:
+        REQUIREMENTS_STAGE_BASE_IMAGE: python:3.11-alpine
+    ports:
+      - "${PORT?}:80"
+    volumes:
+      - type: bind
+        read_only: true
+        source: "${RECOLL_CONFDIR?}"
+        target: /index
