@@ -1,0 +1,16 @@
+__pycache__/
+
+.venv/
+.tox/
+
+dist/
+
+.ruff_cache/
+
+.coverage
+coverage.lcov
+coverage.json
+coverage.xml
+htmlcov/
+
+prof/
