@@ -28,9 +28,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Wait for CI workflow to succeed
+        if: github.event_name != 'workflow_call'
         uses: ArcticLampyrid/action-wait-for-workflow@v1.0.4
         with:
           workflow: ci.yml
+          event: ${{ github.event_name }}
           sha: ${{ github.sha }}
 
       - name: Build
